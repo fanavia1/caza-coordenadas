@@ -1,0 +1,526 @@
+<title>Caza Coordenadas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@400;700;800&display=swap">
+<style>
+/* Layout: carta náutica escolar. Misión y resultado en una columna angosta, el planisferio ocupa el resto; en teléfono todo se apila. */
+:root {
+  --bg: #EEF6F3;
+  --panel: #FFFFFF;
+  --ink: #12304A;
+  --ink-soft: #4C6680;
+  --sea: #BDE3EE;
+  --land: #F2D46B;
+  --land-edge: #A9871C;
+  --grid: rgba(18, 48, 74, .30);
+  --axis: #12304A;
+  --guess: #D81E73;
+  --target: #0A7A43;
+  --line: #CBDDE3;
+  --btn-bg: #12304A;
+  --btn-fg: #FFFFFF;
+  --chip: #DDEFF4;
+  --pin-a: #C2410C;
+  --pin-b: #1F5FCC;
+  --pin-c: #7A2DB8;
+  --pin-fg: #FFFFFF;
+  --font-display: "Baloo 2", "Trebuchet MS", "Segoe UI", sans-serif;
+  --font-body: "Nunito", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0B1A29; --panel: #12283C; --ink: #EAF3F7; --ink-soft: #9FB6C8;
+    --sea: #14405A; --land: #A8964A; --land-edge: #E3D08A;
+    --grid: rgba(234, 243, 247, .30); --axis: #EAF3F7;
+    --guess: #FF77AE; --target: #62E6A0; --line: #254560;
+    --btn-bg: #EAF3F7; --btn-fg: #0B1A29; --chip: #1B3A54;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0B1A29; --panel: #12283C; --ink: #EAF3F7; --ink-soft: #9FB6C8;
+  --sea: #14405A; --land: #A8964A; --land-edge: #E3D08A;
+  --grid: rgba(234, 243, 247, .30); --axis: #EAF3F7;
+  --guess: #FF77AE; --target: #62E6A0; --line: #254560;
+  --btn-bg: #EAF3F7; --btn-fg: #0B1A29; --chip: #1B3A54;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.45;
+  padding-block: 18px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.app { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: 1.9rem; line-height: 1; margin: 0; letter-spacing: -.01em; }
+h1 span { color: var(--guess); }
+.levels { display: flex; flex-wrap: wrap; gap: 6px; }
+.levels button {
+  font: 700 .95rem var(--font-body); color: var(--ink); background: var(--chip);
+  border: 2px solid transparent; border-radius: 999px; padding: 6px 14px; cursor: pointer;
+}
+.levels button[aria-pressed="true"] { background: var(--btn-bg); color: var(--btn-fg); }
+button:focus-visible { outline: 3px solid var(--guess); outline-offset: 2px; }
+.hud { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; font-weight: 700; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.hud b { font-family: var(--font-display); font-weight: 800; font-size: 1.25rem; color: var(--ink); margin-left: 4px; }
+.reset {
+  margin-left: auto; font: 700 .88rem var(--font-body); color: var(--ink-soft); background: transparent;
+  border: 2px solid var(--line); border-radius: 999px; padding: 4px 12px; cursor: pointer;
+}
+.reset.armed { color: var(--btn-fg); background: var(--guess); border-color: var(--guess); }
+.board { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+.prompt, .feedback { background: var(--panel); border: 2px solid var(--line); border-radius: 14px; padding: 14px 16px; min-width: 0; }
+.eyebrow { font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); margin: 0; }
+.coord { font-family: var(--font-display); font-weight: 800; font-size: clamp(2rem, 7vw, 2.7rem); line-height: 1.05; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+.words { margin: 0; color: var(--ink-soft); }
+.feedback h2 { font-family: var(--font-display); font-weight: 800; font-size: 1.4rem; line-height: 1.1; margin: 0 0 6px; text-wrap: balance; }
+.feedback p { margin: 0 0 8px; }
+.pts { font-family: var(--font-display); font-weight: 800; font-size: 1.9rem; line-height: 1; color: var(--target); font-variant-numeric: tabular-nums; margin: 0 0 6px; }
+.pts small { font: 700 .9rem var(--font-body); color: var(--ink-soft); margin-left: 6px; }
+.go {
+  font: 800 1.05rem var(--font-body); color: var(--btn-fg); background: var(--btn-bg);
+  border: 0; border-radius: 12px; padding: 10px 20px; cursor: pointer; margin-top: 4px;
+}
+.picks { display: flex; gap: 10px; margin: 2px 0 12px; }
+.pick {
+  font: 800 1.5rem/1 var(--font-display); color: var(--pin-fg); width: 2.4em; height: 2.4em;
+  border: 3px solid var(--pin-fg); border-radius: 50%; cursor: pointer; box-shadow: 0 0 0 2px var(--line);
+}
+.pa { background: var(--pin-a); } .pb { background: var(--pin-b); } .pc { background: var(--pin-c); }
+.pins { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: .92rem; font-variant-numeric: tabular-nums; }
+.pins li { display: flex; align-items: center; gap: 8px; }
+.pins i { font: 800 .8rem/1.5em var(--font-body); color: var(--pin-fg); width: 1.5em; height: 1.5em; border-radius: 50%; text-align: center; flex: none; }
+.pins em { font-style: normal; font-weight: 800; color: var(--ink-soft); }
+.pins em.ok { color: var(--target); }
+.summary { background: var(--panel); border: 2px solid var(--line); border-radius: 14px; padding: 14px 16px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.summary h2 { font-family: var(--font-display); font-weight: 800; font-size: 1.4rem; line-height: 1.1; margin: 0; }
+.summary h3 { font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); margin: 6px 0 0; }
+.summary p { margin: 0; }
+.scroll { overflow-x: auto; }
+.summary table { border-collapse: collapse; width: 100%; font-size: .93rem; font-variant-numeric: tabular-nums; }
+.summary th, .summary td { text-align: left; padding: 6px 12px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.summary th { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); white-space: nowrap; }
+.summary td.n { white-space: nowrap; font-weight: 700; }
+.tag { font-weight: 800; white-space: nowrap; }
+.tag.ok { color: var(--target); }
+.tag.no { color: var(--guess); }
+.chart { display: grid; grid-template-columns: 3.3em minmax(0, 1fr); grid-template-rows: 1.5em auto; min-width: 0; align-self: start; }
+.lon { grid-column: 2; position: relative; }
+.lat { grid-row: 2; position: relative; }
+.lon span, .lat span { position: absolute; font-size: .74rem; font-weight: 800; color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lon span { transform: translateX(-50%); bottom: 2px; }
+.lat span { transform: translateY(-50%); right: 6px; }
+svg#map {
+  grid-column: 2; grid-row: 2; display: block; width: 100%; aspect-ratio: 2 / 1; max-width: 100%;
+  border: 2px solid var(--axis); border-radius: 6px; background: var(--sea); touch-action: manipulation;
+}
+#land { fill: var(--land); stroke: var(--land-edge); stroke-width: 1; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.gl { stroke: var(--grid); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.ax { stroke: var(--axis); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.card rect { fill: var(--panel); stroke: var(--axis); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.card text { fill: var(--ink); font-family: var(--font-body); font-weight: 800; text-anchor: middle; dominant-baseline: central; letter-spacing: .06em; }
+.pin circle { stroke: var(--pin-fg); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.pin text { fill: var(--pin-fg); font-family: var(--font-body); font-weight: 800; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.pin.live { cursor: pointer; outline: none; }
+.pin.live:focus-visible circle { stroke: var(--ink); stroke-width: 5; }
+.pin.dim { opacity: .45; }
+.tring { fill: none; stroke: var(--target); stroke-width: 4; vector-effect: non-scaling-stroke; }
+.wring { fill: none; stroke: var(--ink); stroke-width: 3; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.pulse { fill: none; stroke: var(--target); stroke-width: 3; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; animation: pulse 1.4s ease-out infinite; }
+@keyframes pulse { from { transform: scale(1); opacity: .9; } to { transform: scale(2.2); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pulse { animation: none; opacity: 0; } }
+@media (max-width: 640px) { .lon span.minor { display: none; } h1 { font-size: 1.6rem; } }
+@media (min-width: 920px) {
+  .board { grid-template-columns: 310px minmax(0, 1fr); grid-template-rows: auto 1fr; }
+  .chart { grid-column: 2; grid-row: 1 / span 2; }
+  .feedback { align-self: start; }
+}
+</style>
+
+<div class="app">
+  <div class="top">
+    <h1>Caza <span>Coordenadas</span></h1>
+    <div class="levels" role="group" aria-label="Nivel">
+      <button type="button" id="lv-explorador" data-level="explorador">Explorador</button>
+      <button type="button" id="lv-navegante" data-level="navegante">Navegante</button>
+      <button type="button" id="lv-capitan" data-level="capitan">Capitán</button>
+    </div>
+  </div>
+  <div class="hud">
+    <span>Ronda<b id="hud-round">1/10</b></span>
+    <span>Puntos<b id="hud-score">0</b></span>
+    <span>Racha<b id="hud-streak">0</b></span>
+    <span>Mejor puntaje<b id="hud-best">0</b></span>
+    <button type="button" class="reset" id="reset">Reiniciar avance</button>
+  </div>
+  <div class="board">
+    <section class="prompt" aria-live="polite">
+      <p class="eyebrow" id="p-eyebrow">Encuentra este punto</p>
+      <p class="coord" id="p-coord">0°, 0°</p>
+      <p class="words" id="p-words"></p>
+    </section>
+    <div class="chart">
+      <div class="lon" id="lon-labels" aria-hidden="true"></div>
+      <div class="lat" id="lat-labels" aria-hidden="true"></div>
+      <svg id="map" viewBox="0 0 360 180" role="group" aria-label="Planisferio con tres pines: A, B y C">
+        <path id="land" d="__LAND_PATH__"></path>
+        <g id="grid"></g>
+        <g id="compass" aria-hidden="true"></g>
+        <g id="marks"></g>
+      </svg>
+    </div>
+    <section class="feedback" id="feedback" aria-live="polite"></section>
+  </div>
+  <section class="summary" id="summary" hidden></section>
+</div>
+
+<script>
+(function () {
+  var NS = 'http://www.w3.org/2000/svg';
+  var ROUNDS = 10, MIN_GAP = 25;
+  var LETTERS = ['A', 'B', 'C'], PIN_CLASS = ['pa', 'pb', 'pc'], PIN_VAR = ['var(--pin-a)', 'var(--pin-b)', 'var(--pin-c)'];
+  var LEVELS = {
+    explorador: { name: 'Explorador', step: 30, latMax: 60, lonMax: 150, grid: true,
+      tip: 'Las coordenadas caen justo donde se cruzan las líneas. Fíjate en qué hemisferio está cada pin.' },
+    navegante: { name: 'Navegante', step: 10, latMax: 70, lonMax: 160, grid: true,
+      tip: 'Las líneas van de 30° en 30°. Calcula a ojo los grados que quedan entre una y otra.' },
+    capitan: { name: 'Capitán', step: 1, latMax: 75, lonMax: 165, grid: false,
+      tip: 'Solo tienes el Ecuador y el meridiano de Greenwich, y los pines están cerca unos de otros. Mide bien.' }
+  };
+  var $ = function (id) { return document.getElementById(id); };
+  var map = $('map'), S;
+
+  function el(name, attrs) {
+    var n = document.createElementNS(NS, name);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function h(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function fmtLat(v) { return v === 0 ? '0°' : Math.abs(v) + '° ' + (v > 0 ? 'N' : 'S'); }
+  function fmtLon(v) { return v === 0 ? '0°' : Math.abs(v) + '° ' + (v > 0 ? 'E' : 'O'); }
+  function fmt(p) { return fmtLat(p.lat) + ', ' + fmtLon(p.lon); }
+  function words(t) {
+    var a = t.lat === 0 ? 'latitud 0°, sobre el Ecuador' : 'latitud ' + Math.abs(t.lat) + '° ' + (t.lat > 0 ? 'norte' : 'sur');
+    var b = t.lon === 0 ? 'longitud 0°, sobre Greenwich' : 'longitud ' + Math.abs(t.lon) + '° ' + (t.lon > 0 ? 'este' : 'oeste');
+    return a + ' · ' + b;
+  }
+  function latPhrase(v) { return v === 0 ? 'sobre el Ecuador' : Math.abs(v) + '° al ' + (v > 0 ? 'norte' : 'sur') + ' del Ecuador'; }
+  function lonPhrase(v) { return v === 0 ? 'sobre el meridiano de Greenwich' : Math.abs(v) + '° al ' + (v > 0 ? 'este' : 'oeste') + ' de Greenwich'; }
+  function randInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+  function shuffle(a) {
+    for (var i = a.length - 1; i > 0; i--) { var j = randInt(0, i), t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+  function randomPoint(L) {
+    return { lat: L.step * randInt(-L.latMax / L.step, L.latMax / L.step),
+             lon: L.step * randInt(-L.lonMax / L.step, L.lonMax / L.step) };
+  }
+  function pick(prev) {
+    var L = LEVELS[S.level], t;
+    do { t = randomPoint(L); } while (prev && prev.lat === t.lat && prev.lon === t.lon);
+    return t;
+  }
+  function gap(a, b) { return Math.sqrt(Math.pow(a.lat - b.lat, 2) + Math.pow(a.lon - b.lon, 2)); }
+  function fits(p, list) {
+    if (Math.abs(p.lat) > 80 || Math.abs(p.lon) > 170) return false;
+    for (var i = 0; i < list.length; i++) if (gap(p, list[i]) < MIN_GAP) return false;
+    return true;
+  }
+  /* Los pines falsos reproducen los errores típicos: hemisferio equivocado, latitud y longitud cruzadas, o unos grados de más. */
+  function decoys(t, level) {
+    var m = [{ lat: -t.lat, lon: t.lon }, { lat: t.lat, lon: -t.lon }, { lat: -t.lat, lon: -t.lon }];
+    if (Math.abs(t.lon) <= 80) m.push({ lat: t.lon, lon: t.lat });
+    var d = level === 'capitan' ? randInt(25, 35) : 30;
+    var n = [{ lat: t.lat + d, lon: t.lon }, { lat: t.lat - d, lon: t.lon }, { lat: t.lat, lon: t.lon + d }, { lat: t.lat, lon: t.lon - d }];
+    shuffle(m); shuffle(n);
+    var order = level === 'explorador' ? m.concat(n)
+      : level === 'navegante' ? [m[0], n[0]].concat(m.slice(1), n.slice(1))
+      : n.concat(m);
+    var out = [t], i, tries = 0;
+    for (i = 0; i < order.length && out.length < 3; i++) if (fits(order[i], out)) out.push(order[i]);
+    while (out.length < 3 && tries++ < 500) { var c = randomPoint(LEVELS[level]); if (fits(c, out)) out.push(c); }
+    while (out.length < 3) out.push({ lat: out.length === 1 ? 45 : -45, lon: out.length === 1 ? 90 : -90 });
+    return out.slice(1);
+  }
+  function deal(prev) {
+    S.target = pick(prev);
+    var pins = shuffle([S.target].concat(decoys(S.target, S.level)));
+    S.pins = pins; S.answer = pins.indexOf(S.target); S.choice = null; S.last = null; S.phase = 'aim';
+  }
+  function best(level, value) {
+    var key = 'caza-coordenadas-mejor-' + level, cur = 0;
+    try { cur = parseInt(localStorage.getItem(key), 10) || 0; } catch (e) {}
+    if (value != null && value > cur) { cur = value; try { localStorage.setItem(key, String(cur)); } catch (e) {} }
+    return cur;
+  }
+  function why(c, t, letter) {
+    var pin = 'El pin ' + letter + ' está ';
+    if (c.lat !== 0 && t.lat !== 0 && (c.lat > 0) !== (t.lat > 0))
+      return pin + 'al ' + (c.lat > 0 ? 'norte' : 'sur') + ' del Ecuador, y la latitud pedida era ' + (t.lat > 0 ? 'norte' : 'sur') + '.';
+    if (c.lon !== 0 && t.lon !== 0 && (c.lon > 0) !== (t.lon > 0))
+      return pin + 'al ' + (c.lon > 0 ? 'este' : 'oeste') + ' de Greenwich, y la longitud pedida era ' + (t.lon > 0 ? 'este' : 'oeste') + '.';
+    if (c.lat !== t.lat)
+      return pin + 'en la latitud ' + fmtLat(c.lat) + ', y se pedía ' + fmtLat(t.lat) + '. La latitud se cuenta desde el Ecuador hacia arriba o hacia abajo.';
+    return pin + 'en la longitud ' + fmtLon(c.lon) + ', y se pedía ' + fmtLon(t.lon) + '. La longitud se cuenta desde Greenwich hacia la derecha o la izquierda.';
+  }
+
+  var KINDS = {
+    ok: { label: 'Aciertos', row: 'Leíste bien la latitud y la longitud.', tip: 'Sigue así: primero la latitud, después la longitud.' },
+    latHemi: { label: 'Norte y sur confundidos', row: 'Confundiste norte con sur.', tip: 'N queda arriba del Ecuador y S queda abajo.' },
+    lonHemi: { label: 'Este y oeste confundidos', row: 'Confundiste este con oeste.', tip: 'E queda a la derecha de Greenwich y O a la izquierda.' },
+    lat: { label: 'Latitud mal medida', row: 'Los grados de latitud no coincidían.', tip: 'Cuenta los grados de latitud desde el Ecuador hacia arriba o hacia abajo.' },
+    lon: { label: 'Longitud mal medida', row: 'Los grados de longitud no coincidían.', tip: 'Cuenta los grados de longitud desde Greenwich hacia los lados.' }
+  };
+  function kindOf(c, t) {
+    if (c.lat === t.lat && c.lon === t.lon) return 'ok';
+    if (c.lat !== 0 && t.lat !== 0 && (c.lat > 0) !== (t.lat > 0)) return 'latHemi';
+    if (c.lon !== 0 && t.lon !== 0 && (c.lon > 0) !== (t.lon > 0)) return 'lonHemi';
+    return c.lat !== t.lat ? 'lat' : 'lon';
+  }
+  function cells(tr, tag, list) {
+    list.forEach(function (c) {
+      var td = h(tag, c.cls || '', typeof c === 'string' ? c : c.text);
+      if (c.node) td.appendChild(c.node);
+      tr.appendChild(td);
+    });
+    return tr;
+  }
+  function table(head) {
+    var wrap = h('div', 'scroll'), t = h('table'), th = h('thead'), tb = h('tbody');
+    th.appendChild(cells(h('tr'), 'th', head)); t.appendChild(th); t.appendChild(tb); wrap.appendChild(t);
+    return { wrap: wrap, body: tb };
+  }
+  function drawSummary() {
+    var box = $('summary'), log = S.log || [];
+    box.textContent = '';
+    box.hidden = !log.length;
+    if (!log.length) return;
+    var count = {}, hits = 0, worst = null;
+    log.forEach(function (e) { count[e.kind] = (count[e.kind] || 0) + 1; if (e.ok) hits++; });
+    for (var k in count) if (k !== 'ok' && (!worst || count[k] > count[worst])) worst = k;
+    box.appendChild(h('h2', '', S.phase === 'end' ? 'Resumen de la partida' : 'Resumen hasta ahora'));
+    box.appendChild(h('p', '', hits + (hits === 1 ? ' acierto' : ' aciertos') + ' y ' + (log.length - hits) + (log.length - hits === 1 ? ' error' : ' errores') +
+      ' en ' + log.length + (log.length === 1 ? ' ronda. ' : ' rondas. ') +
+      (worst ? 'Lo que más te costó: ' + KINDS[worst].label.toLowerCase() + '. ' + KINDS[worst].tip : 'No tuviste errores.')));
+    box.appendChild(h('h3', '', 'Por tipo de respuesta'));
+    var a = table(['Qué pasó', 'Veces', 'Para recordar']);
+    Object.keys(KINDS).forEach(function (key) {
+      if (count[key]) a.body.appendChild(cells(h('tr'), 'td', [{ text: KINDS[key].label, cls: 'tag ' + (key === 'ok' ? 'ok' : 'no') }, { text: String(count[key]), cls: 'n' }, KINDS[key].tip]));
+    });
+    box.appendChild(a.wrap);
+    box.appendChild(h('h3', '', 'Ronda por ronda'));
+    var b = table(['Ronda', 'Se pedía', 'Elegiste', 'Resultado', 'Explicación']);
+    log.forEach(function (e) {
+      b.body.appendChild(cells(h('tr'), 'td', [
+        { text: String(e.round), cls: 'n' }, { text: fmt(e.target), cls: 'n' }, { text: 'Pin ' + e.letter + ': ' + fmt(e.pick), cls: 'n' },
+        { text: e.ok ? 'Acierto +' + e.pts : 'Error', cls: 'tag ' + (e.ok ? 'ok' : 'no') }, KINDS[e.kind].row
+      ]));
+    });
+    box.appendChild(b.wrap);
+  }
+
+  var SKEY = 'caza-coordenadas-sesion-', LKEY = 'caza-coordenadas-nivel';
+  function isPoint(p) { return p && typeof p.lat === 'number' && typeof p.lon === 'number'; }
+  function isIndex(i) { return i === 0 || i === 1 || i === 2; }
+  function valid(d, level) {
+    if (!d || d.level !== level || !LEVELS[level] || !(d.round >= 1 && d.round <= ROUNDS) || typeof d.score !== 'number' || typeof d.streak !== 'number') return false;
+    if (!Array.isArray(d.log) || !d.log.every(function (e) { return e && KINDS[e.kind] && isPoint(e.target) && isPoint(e.pick); })) d.log = [];
+    if (d.phase === 'end') return true;
+    if (d.phase !== 'aim' && d.phase !== 'result') return false;
+    if (!isPoint(d.target) || !Array.isArray(d.pins) || d.pins.length !== 3 || !d.pins.every(isPoint) || !isIndex(d.answer)) return false;
+    if (d.phase === 'result') return isIndex(d.choice) && !!d.last;
+    d.choice = null; d.last = null;
+    return true;
+  }
+  function save() {
+    try {
+      localStorage.setItem(SKEY + S.level, JSON.stringify(S));
+      localStorage.setItem(LKEY, S.level);
+    } catch (e) {}
+  }
+  function load(level) {
+    try {
+      var d = JSON.parse(localStorage.getItem(SKEY + level));
+      if (!valid(d, level)) return false;
+      S = d; draw(); return true;
+    } catch (e) { return false; }
+  }
+  function openLevel(level) { if (!load(level)) newGame(level); }
+  function newGame(level) {
+    S = { level: level, round: 1, score: 0, streak: 0, log: [] };
+    deal(null);
+    draw();
+  }
+  function choose(i) {
+    if (S.phase !== 'aim') return;
+    var ok = i === S.answer;
+    S.choice = i;
+    S.streak = ok ? S.streak + 1 : 0;
+    var mult = S.streak >= 4 ? 2 : S.streak >= 2 ? 1.5 : 1;
+    var pts = ok ? Math.round(100 * mult) : 0;
+    S.score += pts; S.last = { ok: ok, pts: pts, mult: mult }; S.phase = 'result';
+    S.log.push({ round: S.round, target: S.target, pick: S.pins[i], letter: LETTERS[i], ok: ok, pts: pts, kind: kindOf(S.pins[i], S.target) });
+    draw();
+    var b = $('next'); if (b) b.focus({ preventScroll: true });
+  }
+  function next() {
+    if (S.round >= ROUNDS) { S.phase = 'end'; best(S.level, S.score); }
+    else { S.round++; deal(S.target); }
+    draw();
+    if (S.phase === 'end') { var b = $('again'); if (b) b.focus({ preventScroll: true }); }
+  }
+
+  function drawGrid() {
+    var L = LEVELS[S.level], g = $('grid'), lonBox = $('lon-labels'), latBox = $('lat-labels'), v, s;
+    g.textContent = ''; lonBox.textContent = ''; latBox.textContent = '';
+    for (v = -150; v <= 150; v += 30) {
+      if (v !== 0 && !L.grid) continue;
+      g.appendChild(el('line', { x1: v + 180, x2: v + 180, y1: 0, y2: 180, 'class': v === 0 ? 'ax' : 'gl' }));
+      s = h('span', (v / 30) % 2 ? 'minor' : '', fmtLon(v)); s.style.left = ((v + 180) / 3.6) + '%'; lonBox.appendChild(s);
+    }
+    for (v = -60; v <= 60; v += 30) {
+      if (v !== 0 && !L.grid) continue;
+      g.appendChild(el('line', { x1: 0, x2: 360, y1: 90 - v, y2: 90 - v, 'class': v === 0 ? 'ax' : 'gl' }));
+      s = h('span', '', fmtLat(v)); s.style.top = ((90 - v) / 1.8) + '%'; latBox.appendChild(s);
+    }
+  }
+  function drawCompass() {
+    var c = $('compass'), u = 360 / (map.clientWidth || 900), hh = 15 * u;
+    c.textContent = '';
+    [['NORTE', 0, -1], ['SUR', 0, 1], ['OESTE', -1, 0], ['ESTE', 1, 0]].forEach(function (d) {
+      var w = (d[0].length * 7.6 + 12) * u;
+      var x = 180 + d[1] * (180 - w / 2 - 4 * u), y = 90 + d[2] * (90 - hh / 2 - 4 * u);
+      var g = el('g', { 'class': 'card' });
+      g.appendChild(el('rect', { x: x - w / 2, y: y - hh / 2, width: w, height: hh, rx: hh / 2 }));
+      var t = el('text', { x: x, y: y, 'font-size': 10 * u }); t.textContent = d[0]; g.appendChild(t);
+      c.appendChild(g);
+    });
+  }
+  function drawMarks() {
+    var m = $('marks'), u = 360 / (map.clientWidth || 900);
+    m.textContent = '';
+    if (S.phase === 'end') return;
+    var done = S.phase === 'result';
+    S.pins.forEach(function (p, i) {
+      var x = p.lon + 180, y = 90 - p.lat, right = i === S.answer, chosen = i === S.choice;
+      if (done && right) {
+        m.appendChild(el('circle', { cx: x, cy: y, r: 16 * u, 'class': 'pulse' }));
+        m.appendChild(el('circle', { cx: x, cy: y, r: 16 * u, 'class': 'tring' }));
+      } else if (done && chosen) {
+        m.appendChild(el('circle', { cx: x, cy: y, r: 16 * u, 'class': 'wring' }));
+      }
+      var g = el('g', { 'class': 'pin' + (done ? (right || chosen ? '' : ' dim') : ' live') });
+      g.appendChild(el('circle', { cx: x, cy: y, r: 11 * u, style: 'fill:' + PIN_VAR[i] }));
+      var t = el('text', { x: x, y: y, 'font-size': 13 * u }); t.textContent = LETTERS[i]; g.appendChild(t);
+      if (!done) {
+        g.setAttribute('tabindex', '0'); g.setAttribute('role', 'button'); g.setAttribute('aria-label', 'Pin ' + LETTERS[i]);
+        g.addEventListener('click', function () { choose(i); });
+        g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(i); } });
+      }
+      m.appendChild(g);
+    });
+  }
+  function drawPanels() {
+    var L = LEVELS[S.level], f = $('feedback'), r = S.last, b;
+    f.textContent = '';
+    if (S.phase === 'end') {
+      $('p-eyebrow').textContent = 'Partida terminada · nivel ' + L.name;
+      $('p-coord').textContent = S.score + ' puntos';
+      $('p-words').textContent = 'Jugaste ' + ROUNDS + ' rondas.';
+      var rank = S.score >= 1400 ? 'Leyenda del mapa' : S.score >= 900 ? 'Gran navegante' : S.score >= 450 ? 'Buen rumbo' : 'A seguir practicando';
+      f.appendChild(h('h2', '', rank));
+      f.appendChild(h('p', '', S.score >= best(S.level) && S.score > 0
+        ? 'Este es tu mejor puntaje en el nivel ' + L.name + '.'
+        : 'Tu mejor puntaje en este nivel es ' + best(S.level) + '.'));
+      b = h('button', 'go', 'Jugar de nuevo'); b.id = 'again'; b.type = 'button';
+      b.addEventListener('click', function () { newGame(S.level); });
+      f.appendChild(b);
+      return;
+    }
+    $('p-eyebrow').textContent = 'Encuentra este punto';
+    $('p-coord').textContent = fmt(S.target);
+    $('p-words').textContent = words(S.target);
+    if (S.phase === 'aim') {
+      f.appendChild(h('h2', '', '¿Qué pin está en ese punto?'));
+      var row = h('div', 'picks');
+      LETTERS.forEach(function (letter, i) {
+        var pb = h('button', 'pick ' + PIN_CLASS[i], letter);
+        pb.type = 'button'; pb.id = 'pick-' + letter; pb.setAttribute('aria-label', 'Pin ' + letter);
+        pb.addEventListener('click', function () { choose(i); });
+        row.appendChild(pb);
+      });
+      f.appendChild(row);
+      f.appendChild(h('p', '', L.tip));
+      f.appendChild(h('p', '', 'Cada acierto vale 100 puntos. Con 2 aciertos seguidos valen ×1,5; con 4, el doble.'));
+      return;
+    }
+    var right = LETTERS[S.answer];
+    f.appendChild(h('h2', '', r.ok ? '¡Correcto! Era el pin ' + right : 'No era el pin ' + LETTERS[S.choice]));
+    var p = h('p', 'pts', '+' + r.pts);
+    if (r.mult > 1 && r.pts > 0) p.appendChild(h('small', '', 'racha ×' + String(r.mult).replace('.', ',')));
+    f.appendChild(p);
+    f.appendChild(h('p', '', r.ok
+      ? 'El pin ' + right + ' está ' + latPhrase(S.target.lat) + ' y ' + lonPhrase(S.target.lon) + '.'
+      : why(S.pins[S.choice], S.target, LETTERS[S.choice]) + ' La respuesta era el pin ' + right + '.'));
+    var list = h('ul', 'pins');
+    S.pins.forEach(function (pin, i) {
+      var li = h('li'), dot = h('i', PIN_CLASS[i], LETTERS[i]);
+      li.appendChild(dot); li.appendChild(h('span', '', fmt(pin)));
+      if (i === S.answer) li.appendChild(h('em', 'ok', 'respuesta'));
+      else if (i === S.choice) li.appendChild(h('em', '', 'tu elección'));
+      list.appendChild(li);
+    });
+    f.appendChild(list);
+    b = h('button', 'go', S.round >= ROUNDS ? 'Ver resultado' : 'Siguiente'); b.id = 'next'; b.type = 'button';
+    b.addEventListener('click', next);
+    f.appendChild(b);
+  }
+  function draw() {
+    $('hud-round').textContent = S.round + '/' + ROUNDS;
+    $('hud-score').textContent = S.score;
+    $('hud-streak').textContent = S.streak;
+    $('hud-best').textContent = best(S.level);
+    var bs = document.querySelectorAll('.levels button');
+    for (var i = 0; i < bs.length; i++) bs[i].setAttribute('aria-pressed', String(bs[i].dataset.level === S.level));
+    drawGrid(); drawCompass(); drawPanels(); drawMarks(); drawSummary(); save();
+  }
+
+  document.querySelector('.levels').addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (b && b.dataset.level !== S.level) openLevel(b.dataset.level);
+  });
+  var resetBtn = $('reset'), resetTimer = null;
+  function disarm() { clearTimeout(resetTimer); resetBtn.classList.remove('armed'); resetBtn.textContent = 'Reiniciar avance'; }
+  resetBtn.addEventListener('click', function () {
+    if (!resetBtn.classList.contains('armed')) {
+      resetBtn.classList.add('armed'); resetBtn.textContent = 'Toca otra vez para borrar todo';
+      resetTimer = setTimeout(disarm, 4000);
+      return;
+    }
+    disarm();
+    try {
+      for (var k in LEVELS) { localStorage.removeItem(SKEY + k); localStorage.removeItem('caza-coordenadas-mejor-' + k); }
+    } catch (e) {}
+    newGame(S.level);
+  });
+  window.addEventListener('resize', function () { if (S) { drawCompass(); drawMarks(); } });
+
+  function start(data) {
+    var d = data && data.state;
+    if (d && valid(d, d.level)) { S = d; draw(); return; }
+    var lv = null;
+    try { lv = localStorage.getItem(LKEY); } catch (e) {}
+    openLevel(LEVELS[lv] ? lv : 'explorador');
+  }
+  var hot = window.claude && window.claude.hot;
+  try { if (hot && hot.snapshot) hot.snapshot(function () { return { state: S }; }); } catch (e) {}
+  if (hot && hot.ready) hot.ready(start); else start((hot && hot.data) || {});
+})();
+</script>
